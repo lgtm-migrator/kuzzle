@@ -308,37 +308,23 @@ const defaultConfig: KuzzleConfiguration = {
         name: 'kuzzle',
         collections: {
           users: {
-            settings: {
-            // @deprecated : replace undefined by 1
-              number_of_shards: undefined,
-              number_of_replicas: undefined,
-            },
-            mappings: {
-              dynamic: 'false',
-              properties: {
-                profileIds: { type: 'keyword' }
-              }
+            dynamic: 'false',
+            properties: {
+              profileIds: { type: 'keyword' }
             }
           },
           profiles: {
-            settings: {
-            // @deprecated : replace undefined by 1
-              number_of_shards: undefined,
-              number_of_replicas: undefined,
-            },
-            mappings: {
-              dynamic: 'false',
-              properties: {
-                tags: { type: 'keyword' },
-                policies: {
-                  properties: {
-                    roleId: { type: 'keyword' },
-                    restrictedTo: {
-                      type: 'nested',
-                      properties: {
-                        index: { type: 'keyword' },
-                        collections: { type: 'keyword' }
-                      }
+            dynamic: 'false',
+            properties: {
+              tags: { type: 'keyword' },
+              policies: {
+                properties: {
+                  roleId: { type: 'keyword' },
+                  restrictedTo: {
+                    type: 'nested',
+                    properties: {
+                      index: { type: 'keyword' },
+                      collections: { type: 'keyword' }
                     }
                   }
                 }
@@ -346,82 +332,47 @@ const defaultConfig: KuzzleConfiguration = {
             }
           },
           roles: {
-            settings: {
-            // @deprecated : replace undefined by 1
-              number_of_shards: undefined,
-              number_of_replicas: undefined,
-            },
-            mappings: {
-              dynamic: 'false',
-              properties: {
-                tags: { type: 'keyword' },
-                controllers: {
-                  dynamic: 'false',
-                  properties: {}
-                }
+            dynamic: 'false',
+            properties: {
+              tags: { type: 'keyword' },
+              controllers: {
+                dynamic: 'false',
+                properties: {}
               }
             }
           },
           validations: {
-            settings: {
-            // @deprecated : replace undefined by 1
-              number_of_shards: undefined,
-              number_of_replicas: undefined,
-            },
-            mappings: {
-              properties: {
-                index: { type: 'keyword' },
-                collection: { type: 'keyword' },
-                validations: {
-                  dynamic: 'false',
-                  properties: {}
-                }
+            properties: {
+              index: { type: 'keyword' },
+              collection: { type: 'keyword' },
+              validations: {
+                dynamic: 'false',
+                properties: {}
               }
             }
           },
           config: {
-            settings: {
-            // @deprecated : replace undefined by 1
-              number_of_shards: undefined,
-              number_of_replicas: undefined,
-            },
-            mappings: {
-              dynamic: 'false',
-              properties: {}
-            }
+            dynamic: 'false',
+            properties: {}
           },
           'api-keys': {
-            settings: {
-            // @deprecated : replace undefined by 1
-              number_of_shards: undefined,
-              number_of_replicas: undefined,
-            },
-            mappings: {
-              dynamic: 'false',
-              properties: {
-                userId: { type: 'keyword' },
-                hash: { type: 'keyword' },
-                description: { type: 'text' },
-                expiresAt: { type: 'long' },
-                ttl: { type: 'keyword' },
-                token: { type: 'keyword' }
-              }
+            dynamic: 'false',
+            properties: {
+              userId: { type: 'keyword' },
+              hash: { type: 'keyword' },
+              description: { type: 'text' },
+              expiresAt: { type: 'long' },
+              ttl: { type: 'keyword' },
+              token: { type: 'keyword' }
             }
           },
           installations: {
-            settings: {
-            // @deprecated : replace undefined by 1
-              number_of_shards: undefined,
-              number_of_replicas: undefined,
+            dynamic: 'strict',
+            properties: {
+              description: { type: 'text' },
+              handler: { type: 'text' },
+              installedAt: { type: 'date' }
             },
-            mappings: {
-              dynamic: 'strict',
-              properties: {
-                description: { type: 'text' },
-                handler: { type: 'text' },
-                installedAt: { type: 'date' }
-              },
-            }
           }
         }
       },

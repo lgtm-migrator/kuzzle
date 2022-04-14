@@ -112,67 +112,39 @@ export type StorageEngineElasticsearch = {
 
     collections: {
       users: {
-        settings: {
-          /**
-           * @default 1
-           */
-          number_of_shards: number;
+        /**
+         * @default 'false'
+         */
+        dynamic: 'true' | 'false' | 'strict';
 
+        properties: {
           /**
-           * @default 1
+           * @default
+           *
+           * [
+           *   {
+           *     type: 'keyword',
+           *   }
+           * ]
            */
-          number_of_replicas: number;
-        };
-
-        mappings: {
-          /**
-           * @default 'false'
-           */
-          dynamic: 'true' | 'false' | 'strict';
-
-          properties: {
-            /**
-             * @default
-             *
-             * [
-             *   {
-             *     type: 'keyword',
-             *   }
-             * ]
-             */
-            profileIds: {
-              type: string;
-            };
+          profileIds: {
+            type: string;
           };
         };
       };
 
       profiles: {
-        settings: {
-          /**
-           * @default 1
-           */
-          number_of_shards: number;
-
-          /**
-           * @default 1
-           */
-          number_of_replicas: number;
-        };
-
-        mappings: {
-          dynamic: 'false';
-          properties: {
-            tags: { type: 'keyword' };
-            policies: {
-              properties: {
-                roleId: { type: 'keyword' };
-                restrictedTo: {
-                  type: 'nested';
-                  properties: {
-                    index: { type: 'keyword' };
-                    collections: { type: 'keyword' };
-                  };
+        dynamic: 'false';
+        properties: {
+          tags: { type: 'keyword' };
+          policies: {
+            properties: {
+              roleId: { type: 'keyword' };
+              restrictedTo: {
+                type: 'nested';
+                properties: {
+                  index: { type: 'keyword' };
+                  collections: { type: 'keyword' };
                 };
               };
             };
@@ -181,120 +153,50 @@ export type StorageEngineElasticsearch = {
       };
 
       roles: {
-        settings: {
-          /**
-           * @default 1
-           */
-          number_of_shards: number;
-
-          /**
-           * @default 1
-           */
-          number_of_replicas: number;
-        };
-
-        mappings: {
-          dynamic: 'false';
-          properties: {
-            tags: { type: 'keyword' };
-            controllers: {
-              dynamic: 'false';
-              properties: Record<string, unknown>;
-            };
+        dynamic: 'false';
+        properties: {
+          tags: { type: 'keyword' };
+          controllers: {
+            dynamic: 'false';
+            properties: Record<string, unknown>;
           };
         };
       };
 
       validations: {
-        settings: {
-          /**
-           * @default 1
-           */
-          number_of_shards: number;
-
-          /**
-           * @default 1
-           */
-          number_of_replicas: number;
-        };
-
-        mappings: {
-          properties: {
-            index: { type: 'keyword' };
-            collection: { type: 'keyword' };
-            validations: {
-              dynamic: 'false';
-              properties: Record<string, unknown>;
-            };
+        properties: {
+          index: { type: 'keyword' };
+          collection: { type: 'keyword' };
+          validations: {
+            dynamic: 'false';
+            properties: Record<string, unknown>;
           };
         };
       };
 
       config: {
-        settings: {
-          /**
-           * @default 1
-           */
-          number_of_shards: number;
-
-          /**
-           * @default 1
-           */
-          number_of_replicas: number;
-        };
-
-        mappings: {
-          dynamic: 'false';
-          properties: Record<string, unknown>;
-        };
+        dynamic: 'false';
+        properties: Record<string, unknown>;
       };
 
       'api-keys': {
-        settings: {
-          /**
-           * @default 1
-           */
-          number_of_shards: number;
-
-          /**
-           * @default 1
-           */
-          number_of_replicas: number;
-        };
-
-        mappings: {
-          dynamic: 'false';
-          properties: {
-            userId: { type: 'keyword' };
-            hash: { type: 'keyword' };
-            description: { type: 'text' };
-            expiresAt: { type: 'long' };
-            ttl: { type: 'keyword' };
-            token: { type: 'keyword' };
-          };
+        dynamic: 'false';
+        properties: {
+          userId: { type: 'keyword' };
+          hash: { type: 'keyword' };
+          description: { type: 'text' };
+          expiresAt: { type: 'long' };
+          ttl: { type: 'keyword' };
+          token: { type: 'keyword' };
         };
       };
 
       installations: {
-        settings: {
-          /**
-           * @default 1
-           */
-          number_of_shards: number;
-
-          /**
-           * @default 1
-           */
-          number_of_replicas: number;
-        };
-
-        mappings: {
-          dynamic: 'strict';
-          properties: {
-            description: { type: 'text' };
-            handler: { type: 'text' };
-            installedAt: { type: 'date' };
-          };
+        dynamic: 'strict';
+        properties: {
+          description: { type: 'text' };
+          handler: { type: 'text' };
+          installedAt: { type: 'date' };
         };
       };
     };
