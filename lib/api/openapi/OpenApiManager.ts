@@ -100,6 +100,7 @@ export class OpenApiManager {
   /* eslint-enable sort-keys */
 
   public applicationDefinition: OpenApiDefinition;
+  public allDefinitions: OpenApiDefinition;
 
   /**
    * @param applicationDefinition Application OpenApi definition
@@ -112,6 +113,11 @@ export class OpenApiManager {
 
     generateOpenApi(pluginsRoutes, this.applicationDefinition);
 
+    this.allDefinitions = {
+      ...this.kuzzleDefinition,
+      ...this.applicationDefinition
+    };
+
     this.registerAskEvents();
   }
 
@@ -119,5 +125,8 @@ export class OpenApiManager {
     global.kuzzle.onAsk('core:api:openapi:kuzzle', () => this.kuzzleDefinition);
 
     global.kuzzle.onAsk('core:api:openapi:app', () => this.applicationDefinition);
+
+    global.kuzzle.onAsk('core:api:openapi:all', () => this.allDefinitions)
+
   }
 }
