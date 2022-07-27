@@ -194,6 +194,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
   deploy-workflow:
+    if: github.event_name != 'pull_request'
     name: Deployment Workflow
     needs: [cluster-monkey-tests]
     uses: ./.github/workflows/workflow-deployments.yaml
