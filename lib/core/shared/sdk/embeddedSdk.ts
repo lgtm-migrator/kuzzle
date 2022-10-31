@@ -27,7 +27,6 @@ import {
   UserOption,
   Kuzzle,
   RequestPayload,
-  ResponsePayload,
   BaseRequest,
 } from "kuzzle-sdk";
 

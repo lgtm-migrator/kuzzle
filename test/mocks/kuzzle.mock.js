@@ -3,7 +3,7 @@
 const sinon = require("sinon");
 const Bluebird = require("bluebird");
 
-const KuzzleEventEmitter = require("../../lib/kuzzle/event/kuzzleEventEmitter");
+const { KuzzleEventEmitter } = require("../../lib/kuzzle/event/KuzzleEventEmitter");
 const kuzzleStateEnum = require("../../lib/kuzzle/kuzzleStateEnum");
 const configLoader = require("../../lib/config");
 

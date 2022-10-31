@@ -3,14 +3,14 @@
 const should = require("should");
 const sinon = require("sinon");
 
-const Emitter = require("../../../lib/kuzzle/event/kuzzleEventEmitter");
+const { KuzzleEventEmitter } = require("../../../lib/kuzzle/event/KuzzleEventEmitter");
 const { InternalError: KuzzleInternalError } = require("../../../index");
 
 describe("#KuzzleEventEmitter", () => {
   let emitter;
 
   beforeEach(() => {
-    emitter = new Emitter(10, 50);
+    emitter = new KuzzleEventEmitter(10, 50);
   });
 
   describe("#hooks", () => {

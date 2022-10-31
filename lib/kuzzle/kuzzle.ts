@@ -29,7 +29,7 @@ import segfaultHandler from "node-segfault-handler";
 import _ from "lodash";
 
 import kuzzleStateEnum from "./kuzzleStateEnum";
-import KuzzleEventEmitter from "./event/kuzzleEventEmitter";
+import { KuzzleEventEmitter } from "./event/KuzzleEventEmitter";
 import EntryPoint from "../core/network/entryPoint";
 import Funnel from "../api/funnel";
 import PassportWrapper from "../core/auth/passportWrapper";
@@ -433,21 +433,6 @@ class Kuzzle extends KuzzleEventEmitter {
     } finally {
       await mutex.unlock();
     }
-  }
-
-  // For testing purpose
-  async ask(...args: any[]) {
-    return super.ask(...args);
-  }
-
-  // For testing purpose
-  async emit(...args: any[]) {
-    return super.emit(...args);
-  }
-
-  // For testing purpose
-  async pipe(...args: any[]) {
-    return super.pipe(...args);
   }
 
   private async importUserMappings(
