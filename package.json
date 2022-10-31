@@ -91,6 +91,7 @@
   "devDependencies": {
     "@types/js-yaml": "^4.0.5",
     "@types/lodash": "^4.14.184",
+    "auto": "^10.37.6",
     "async": "^3.2.4",
     "chokidar": "^3.5.3",
     "codecov": "^3.8.3",

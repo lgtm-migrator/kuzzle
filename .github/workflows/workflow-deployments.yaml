@@ -102,6 +102,8 @@ jobs:
           node-version: ${{ env.NODE_LTS_ACTIVE_VERSION }}
           registry-url: "https://registry.npmjs.org"
       - run: npm install
-      - run: npm publish
+      - run: npm run build
+      - run: auto shipit
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
