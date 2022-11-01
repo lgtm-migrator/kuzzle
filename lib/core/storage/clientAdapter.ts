@@ -24,7 +24,7 @@ import { IndexCache } from "./indexCache";
 import { isPlainObject } from "../../util/safeObject";
 import * as kerror from "../../kerror";
 import { Mutex } from "../../util/mutex";
-import { VirtualIndex } from "../../service/storage/virtualIndex";
+import { MongoDB } from "../../service/storage/mongodb";
 
 const servicesError = kerror.wrap("services", "storage");
 
@@ -33,10 +33,9 @@ const servicesError = kerror.wrap("services", "storage");
  * and to maintain the index/collection cache.
  */
 export class ClientAdapter {
-  client: Elasticsearch;
+  client: MongoDB;
   cache: IndexCache;
   scope: string;
-  virtualIndex: VirtualIndex;
 
   static getMutex() {
     return new Mutex("loadMappings", { timeout: -1, ttl: 60000 });
@@ -55,10 +54,9 @@ export class ClientAdapter {
    * @param {storeScopeEnum} scope
    */
   constructor(scope, virtualIndex) {
-    this.client = ClientAdapter.createElasticSearch(scope, virtualIndex);
+    this.client = new MongoDB(global.kuzzle.config.services.storageEngine, scope);
     this.scope = scope;
     this.cache = new IndexCache();
-    this.virtualIndex = virtualIndex;
   }
 
   async init() {
@@ -128,7 +126,6 @@ export class ClientAdapter {
     }
 
     this.addCache(index);
-    this.client.createVirtualIndex(index, physicalIndex);
     for (const collection of this.cache.listCollections(physicalIndex)) {
       this.cache.addCollection(index, collection);
       //send message to propagate cache population :
@@ -390,13 +387,7 @@ export class ClientAdapter {
      * @returns {string[]}
      */
     global.kuzzle.onAsk(`core:storage:${this.scope}:index:list`, (type?) => {
-      const indexes = this.cache.listIndexes();
-      if (type === "virtual") {
-        return indexes.filter((index) => this.virtualIndex.isVirtual(index));
-      } else if (type === "physical") {
-        return indexes.filter((index) => !this.virtualIndex.isVirtual(index));
-      }
-      return indexes;
+      return this.cache.listIndexes();
     });
 
     /**

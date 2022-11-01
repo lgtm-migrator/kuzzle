@@ -284,6 +284,7 @@ const defaultConfig: KuzzleConfiguration = {
       aliases: ["storageEngine"],
       backend: "elasticsearch",
       client: {
+        uri: "mongodb://mongodb:27017/?maxPoolSize=20&w=majority",
         node: "http://localhost:9200",
       },
       commonMapping: {

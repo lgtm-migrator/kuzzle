@@ -105,6 +105,11 @@ services:
       timeout: 3s
       retries: 30
 
+  mongodb:
+    image: mongo:latest
+    ports:
+      - 27017:27017
+
   elasticsearch:
     image: kuzzleio/elasticsearch:7
     container_name: kuzzle_elasticsearch

@@ -25,7 +25,7 @@ export type StorageEngineElasticsearch = {
    * }
    *
    */
-  client: ClientOptions;
+  client: any; // @todo mongodb ClientOptions;
 
   /**
    * Default policy against new fields that are not referenced in the
