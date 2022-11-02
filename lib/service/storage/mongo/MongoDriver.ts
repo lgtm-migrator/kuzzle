@@ -1,8 +1,9 @@
 import { CollectionMappings, JSONObject } from "kuzzle-sdk";
 import { MongoClient, ObjectId } from "mongodb";
 
-import { Service } from "../service";
-import * as kerrorLib from "../../kerror";
+import { Service } from "../../service";
+import * as kerrorLib from "../../../kerror";
+import { flattenObject } from "../../../util/flattenObject";
 
 const kerror = kerrorLib.wrap("services", "storage");
 
@@ -99,8 +100,9 @@ export class MongoDB extends Service {
   }
 
   async info(): Promise<any> {
-    throw Error("Not Implemented");
+    return {};
   }
+
   async stats(): Promise<{
     indexes: unknown[];
     size: number;
@@ -178,14 +180,24 @@ export class MongoDB extends Service {
   /**
    * Gets the document with given ID
    *
-   * @param {String} index - Index name
-   * @param {String} collection - Collection name
-   * @param {String} id - Document ID
+   * @param index - Index name
+   * @param collection - Collection name
+   * @param id - Document ID
    *
    * @returns {Promise.<{ _id, _version, _source }>}
    */
-  get(index: any, collection: any, id: any): Promise<any> {
-    throw Error("Not Implemented");
+  async get(index: string, collection: string, id: string): Promise<JSONObject> {
+    const document = await this.getCollection(index, collection).findOne({ _id: getId(id) });
+
+    if (document === null) {
+      throw kerror.get("not_found", id, index, collection);
+    }
+
+    return {
+      _id: id,
+      _source: document,
+      _version: null,
+    };
   }
   /**
    * Returns the list of documents matching the ids given in the body param
@@ -239,25 +251,42 @@ export class MongoDB extends Service {
    *
    * @returns {Promise.<Object>} { _id, _version, _source }
    */
-  create(
-    index: any,
-    collection: any,
-    content: any,
+  async create(
+    index: string,
+    collection: string,
+    content: JSONObject,
     {
       id,
       refresh,
       userId,
     }: {
-      id: any;
+      id: string;
       refresh: any;
-      userId?: any;
+      userId?: string;
     }
   ): Promise<{
     _id: string;
-    _source: any;
-    _version: any;
+    _source: JSONObject;
+    _version: string;
   }> {
-    throw Error("Not Implemented");
+    const document: any = {
+      ...content,
+      _id: id ? getId(id) : undefined,
+      _kuzzle_info: {
+        author: getKuid(userId),
+        createdAt: Date.now(),
+        updatedAt: null,
+        updater: null,
+      }
+    };
+
+    const result = await this.getCollection(index, collection).insertOne(document);
+
+    return {
+      _id: result.insertedId.toString(),
+      _source: document,
+      _version: null,
+    }
   }
   /**
    * Creates a new document to ElasticSearch, or replace it if it already exist
@@ -270,7 +299,7 @@ export class MongoDB extends Service {
    *
    * @returns {Promise.<Object>} { _id, _version, _source, created }
    */
-  createOrReplace(
+  async createOrReplace(
     index: string,
     collection: string,
     id: string,
@@ -290,7 +319,34 @@ export class MongoDB extends Service {
     _version: any;
     created: boolean;
   }> {
-    throw Error("Not Implemented");
+    const changes = {
+      ...content,
+      ...(injectKuzzleMeta && {
+        author: getKuid(userId),
+        createdAt: Date.now(),
+        updatedAt: null,
+        updater: null,
+      }),
+    };
+
+    const ret = await this.getCollection(index, collection).updateOne(
+      {
+        _id: getId(id),
+      },
+      { "$set": flattenObject(changes) },
+      {
+        upsert: true,
+      }
+    );
+
+    const document = await this.get(index, collection, id);
+
+    return {
+      _id: ret.upsertedId.toString(),
+      _source: document,
+      _version: null,
+      created: ret.upsertedCount === 1,
+    };
   }
   /**
    * Sends the partial document to elasticsearch with the id to update
@@ -303,11 +359,11 @@ export class MongoDB extends Service {
    *
    * @returns {Promise.<{ _id, _version }>}
    */
-  update(
-    index: any,
-    collection: any,
-    id: any,
-    content: any,
+  async update(
+    index: string,
+    collection: string,
+    id: string,
+    content: JSONObject,
     {
       refresh,
       userId,
@@ -322,7 +378,26 @@ export class MongoDB extends Service {
     _source: any;
     _version: any;
   }> {
-    throw Error("Not Implemented");
+    const changes = {
+      ...flattenObject(content),
+      updatedAt: Date.now(),
+      updater: getKuid(userId),
+    };
+
+    const ret = await this.getCollection(index, collection).updateOne(
+      {
+        _id: getId(id),
+      },
+      { "$set": changes },
+    );
+
+    const document = await this.get(index, collection, id);
+
+    return {
+      _id: ret.upsertedId,
+      _source: document,
+      _version: null,
+    };
   }
   /**
    * Sends the partial document to elasticsearch with the id to update
@@ -400,17 +475,23 @@ export class MongoDB extends Service {
    *
    * @returns {Promise}
    */
-  delete(
-    index: any,
-    collection: any,
-    id: any,
+  async delete(
+    index: string,
+    collection: string,
+    id: string,
     {
       refresh,
     }: {
       refresh: any;
     }
-  ): Promise<any> {
-    throw Error("Not Implemented");
+  ): Promise<void> {
+    const result = await this.getCollection(index, collection).deleteOne({
+      _id: getId(id),
+    });
+
+    if (result.deletedCount === 0) {
+      throw kerror.get("not_found", id, index, collection);
+    }
   }
 
   /**
@@ -1116,4 +1197,12 @@ export class MongoDB extends Service {
   }> {
     throw Error("Not Implemented");
   }
+}
+
+function getKuid(userId: string) {
+  return userId ? String(userId) : null;
+}
+
+function getId (id: string) {
+  return ObjectId.isValid(id) ? new ObjectId(id): id;
 }
