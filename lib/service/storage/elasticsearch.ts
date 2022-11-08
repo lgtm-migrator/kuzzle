@@ -633,7 +633,7 @@ export class Elasticsearch extends Service {
    */
   async mGet(index, collection, ids) {
     if (ids.length === 0) {
-      return { errors: [], item: [] };
+      return { errors: [], items: [] };
     }
 
     const esRequest = {

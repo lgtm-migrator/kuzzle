@@ -24,7 +24,7 @@ import { IndexCache } from "./indexCache";
 import { isPlainObject } from "../../util/safeObject";
 import * as kerror from "../../kerror";
 import { Mutex } from "../../util/mutex";
-import { MongoDB } from "../../service/storage/mongodb";
+import { MongoDriver } from "../../service/storage/mongo/MongoDriver";
 
 const servicesError = kerror.wrap("services", "storage");
 
@@ -33,7 +33,7 @@ const servicesError = kerror.wrap("services", "storage");
  * and to maintain the index/collection cache.
  */
 export class ClientAdapter {
-  client: MongoDB;
+  client: MongoDriver;
   cache: IndexCache;
   scope: string;
 
@@ -54,7 +54,7 @@ export class ClientAdapter {
    * @param {storeScopeEnum} scope
    */
   constructor(scope, virtualIndex) {
-    this.client = new MongoDB(global.kuzzle.config.services.storageEngine, scope);
+    this.client = new MongoDriver(global.kuzzle.config.services.storageEngine, scope);
     this.scope = scope;
     this.cache = new IndexCache();
   }

@@ -1,9 +1,10 @@
-import { CollectionMappings, JSONObject } from "kuzzle-sdk";
-import { MongoClient, ObjectId } from "mongodb";
+import { CollectionMappings, JSONObject, KDocument } from "kuzzle-sdk";
+import { Document, MongoAPIError, MongoClient, MongoServerError, ObjectId, WithId } from "mongodb";
 
 import { Service } from "../../service";
 import * as kerrorLib from "../../../kerror";
 import { flattenObject } from "../../../util/flattenObject";
+import { KuzzleError } from "../../../kerror/errors";
 
 const kerror = kerrorLib.wrap("services", "storage");
 
@@ -11,7 +12,7 @@ const FORBIDDEN_DATABASE_CHAR = "/\\. \"$*<>:|?";
 const FORBIDDEN_COLLECTION_CHAR = "$"
 const HIDDEN_COLLECTION = "_kuzzle_keep";
 
-export class MongoDB extends Service {
+export class MongoDriver extends Service {
   private client: MongoClient;
   private scope: string;
 
@@ -109,6 +110,7 @@ export class MongoDB extends Service {
   }> {
     throw Error("Not Implemented");
   }
+
   async scroll(scrollId: any, opts: any): Promise<{
     aggregations: any;
     hits: {
@@ -127,16 +129,15 @@ export class MongoDB extends Service {
   }> {
     throw Error("Not Implemented");
   }
+
   /**
    * Searches documents from elasticsearch with a query
    *
-   * @param {String} index - Index name
-   * @param {String} collection - Collection name
-   * @param {Object} searchBody - Search request body (query, sort, etc.)
+   * @param index - Index name
+   * @param collection - Collection name
+   * @param searchBody - Search request body (query, sort, etc.)
    * @param targets - contain index and collections for multisearch. If target is not null, index and collection sould be null.
-   * @param {Object} options - from (undefined), size (undefined), scroll (undefined)
-   *
-   * @returns {Promise.<{ scrollId, hits, aggregations, suggest, total }>}
+   * @param options - from (undefined), size (undefined), scroll (undefined)
    */
   async search(
     {
@@ -145,38 +146,73 @@ export class MongoDB extends Service {
       searchBody,
       targets,
     }: {
-      index: any;
-      collection: any;
-      searchBody: any;
+      index: string;
+      collection: string;
+      searchBody: {
+        query: JSONObject;
+        sort: JSONObject;
+      };
       targets: any;
     },
     {
-      from,
-      size,
-      scroll,
+      from=0,
+      size=10,
+      scroll=null,
     }: {
-      from: any;
-      size: any;
-      scroll: any;
-    }
+      from?: number;
+      size?: number;
+      scroll?: string;
+    } = {}
   ): Promise<{
     aggregations: any;
-    hits: {
+    hits: Array<{
       _id: string;
-      _score: any;
-      _source: any;
-      collection: any;
+      _score: 0;
+      _source: JSONObject;
+      collection: string;
       highlight: any;
-      index: any;
+      index: string;
       inner_hits: {};
-    }[];
-    remaining: any;
-    scrollId: any;
+    }>;
+    remaining: number;
+    scrollId: string;
     suggest: any;
-    total: any;
+    total: number;
   }> {
-    throw Error("Not Implemented");
+    try {
+      const [documents, remaining] = await Promise.all([
+        this.getCollection(index, collection)
+          .find(searchBody.query)
+          .sort(searchBody.sort)
+          .skip(from)
+          .limit(size)
+          .toArray(),
+        this.getCollection(index, collection)
+          .countDocuments(searchBody.query, { skip: from })
+      ]);
+
+      return {
+        aggregations: undefined,
+        remaining,
+        total: remaining + from,
+        scrollId: undefined,
+        suggest: undefined,
+        hits: documents.map((document) => ({
+          _id: document._id.toString(),
+          _score: 0,
+          _source: document,
+          collection,
+          highlight: undefined,
+          index,
+          inner_hits: {},
+        })),
+      };
+    }
+    catch (error) {
+      throw this.wrapError(error);
+    }
   }
+
   /**
    * Gets the document with given ID
    *
@@ -187,46 +223,54 @@ export class MongoDB extends Service {
    * @returns {Promise.<{ _id, _version, _source }>}
    */
   async get(index: string, collection: string, id: string): Promise<JSONObject> {
-    const document = await this.getCollection(index, collection).findOne({ _id: getId(id) });
+    try {
+      const document = await this.getCollection(index, collection).findOne({ _id: getId(id) });
 
-    if (document === null) {
-      throw kerror.get("not_found", id, index, collection);
+      if (document === null) {
+        throw kerror.get("not_found", id, index, collection);
+      }
+
+      return format(document);
     }
-
-    return {
-      _id: id,
-      _source: document,
-      _version: null,
-    };
+    catch (error) {
+      throw this.wrapError(error);
+    }
   }
   /**
    * Returns the list of documents matching the ids given in the body param
    * NB: Due to internal Kuzzle mechanism, can only be called on a single
    * index/collection, using the body { ids: [.. } syntax.
    *
-   * @param {String} index - Index name
-   * @param {String} collection - Collection name
-   * @param {Array.<String>} ids - Document IDs
-   *
-   * @returns {Promise.<{ items: Array<{ _id, _source, _version }>, errors }>}
+   * @param index - Index name
+   * @param collection - Collection name
+   * @param ids - Document IDs
    */
-  mGet(
-    index: any,
-    collection: any,
-    ids: any
-  ): Promise<
-    | {
-        errors: any[];
-        item: any[];
-        items?: undefined;
+  async mGet(
+    index: string,
+    collection: string,
+    ids: string[]
+  ): Promise<{
+    errors: string[];
+    items: KDocument<JSONObject>[];
+  }> {
+    try {
+      const documents = await this.getCollection(index, collection).find({ _id: { $in: ids.map(getId) } }).toArray();
+
+      const missings = [];
+      for (const document of documents) {
+        if (!ids.includes(document._id.toString())) {
+          missings.push(document._id.toString());
+        }
       }
-    | {
-        errors: any[];
-        items: any[];
-        item?: undefined;
+
+      return {
+        errors: missings,
+        items: documents.map(format),
       }
-  > {
-    throw Error("Not Implemented");
+    }
+    catch (error) {
+      throw this.wrapError(error);
+    }
   }
   /**
    * Counts how many documents match the filter given in body
@@ -269,23 +313,28 @@ export class MongoDB extends Service {
     _source: JSONObject;
     _version: string;
   }> {
-    const document: any = {
-      ...content,
-      _id: id ? getId(id) : undefined,
-      _kuzzle_info: {
-        author: getKuid(userId),
-        createdAt: Date.now(),
-        updatedAt: null,
-        updater: null,
-      }
-    };
+    try {
+      const document: any = {
+        ...content,
+        _id: id ? getId(id) : undefined,
+        _kuzzle_info: {
+          author: getKuid(userId),
+          createdAt: Date.now(),
+          updatedAt: null,
+          updater: null,
+        }
+      };
 
-    const result = await this.getCollection(index, collection).insertOne(document);
+      const result = await this.getCollection(index, collection).insertOne(document);
 
-    return {
-      _id: result.insertedId.toString(),
-      _source: document,
-      _version: null,
+      return {
+        _id: result.insertedId.toString(),
+        _source: document,
+        _version: null,
+      };
+    }
+    catch (error) {
+      throw this.wrapError(error);
     }
   }
   /**
@@ -319,34 +368,39 @@ export class MongoDB extends Service {
     _version: any;
     created: boolean;
   }> {
-    const changes = {
-      ...content,
-      ...(injectKuzzleMeta && {
-        author: getKuid(userId),
-        createdAt: Date.now(),
-        updatedAt: null,
-        updater: null,
-      }),
-    };
+    try {
+      const changes = {
+        ...content,
+        ...(injectKuzzleMeta && {
+          author: getKuid(userId),
+          createdAt: Date.now(),
+          updatedAt: null,
+          updater: null,
+        }),
+      };
 
-    const ret = await this.getCollection(index, collection).updateOne(
-      {
-        _id: getId(id),
-      },
-      { "$set": flattenObject(changes) },
-      {
-        upsert: true,
-      }
-    );
+      const ret = await this.getCollection(index, collection).updateOne(
+        {
+          _id: getId(id),
+        },
+        { "$set": flattenObject(changes) },
+        {
+          upsert: true,
+        }
+      );
 
-    const document = await this.get(index, collection, id);
+      const document = await this.get(index, collection, id);
 
-    return {
-      _id: ret.upsertedId.toString(),
-      _source: document,
-      _version: null,
-      created: ret.upsertedCount === 1,
-    };
+      return {
+        _id: id,
+        _source: document,
+        _version: null,
+        created: ret.upsertedCount === 1,
+      };
+    }
+    catch (error) {
+      throw this.wrapError(error);
+    }
   }
   /**
    * Sends the partial document to elasticsearch with the id to update
@@ -378,26 +432,31 @@ export class MongoDB extends Service {
     _source: any;
     _version: any;
   }> {
-    const changes = {
-      ...flattenObject(content),
-      updatedAt: Date.now(),
-      updater: getKuid(userId),
-    };
+    try {
+      const changes = {
+        ...flattenObject(content),
+        updatedAt: Date.now(),
+        updater: getKuid(userId),
+      };
 
-    const ret = await this.getCollection(index, collection).updateOne(
-      {
-        _id: getId(id),
-      },
-      { "$set": changes },
-    );
+      const ret = await this.getCollection(index, collection).updateOne(
+        {
+          _id: getId(id),
+        },
+        { "$set": changes },
+      );
 
-    const document = await this.get(index, collection, id);
+      const document = await this.get(index, collection, id);
 
-    return {
-      _id: ret.upsertedId,
-      _source: document,
-      _version: null,
-    };
+      return {
+        _id: ret.upsertedId,
+        _source: document,
+        _version: null,
+      };
+    }
+    catch (error) {
+      throw this.wrapError(error);
+    }
   }
   /**
    * Sends the partial document to elasticsearch with the id to update
@@ -626,28 +685,33 @@ export class MongoDB extends Service {
    * Execute the callback with a batch of documents of specified size until all
    * documents matched by the query have been processed.
    *
-   * @param {String} index - Index name
-   * @param {String} collection - Collection name
-   * @param {Object} query - Query to match documents
-   * @param {Function} callback - callback that will be called with the "hits" array
-   * @param {Object} options - size (10), scrollTTL ('5s')
-   *
-   * @returns {Promise.<any[]>} Array of results returned by the callback
+   * @param index - Index name
+   * @param collection - Collection name
+   * @param query - Query to match documents
+   * @param callback - callback that will be called with the "hits" array
+   * @param options - size (10)
    */
-  mExecute(
-    index: any,
-    collection: any,
-    query: any,
-    callback: any,
+  async mExecute(
+    index: string,
+    collection: string,
+    query: JSONObject,
+    callback: Function,
     {
-      size,
+      size=10,
       scrollTTl,
     }: {
       size?: number;
       scrollTTl?: string;
+    } = {},
+  ): Promise<void> {
+    try {
+      await this.getCollection(index, collection).find(query).batchSize(size).forEach(document => {
+        callback([format(document)]);
+      });
     }
-  ): Promise<any[]> {
-    throw Error("Not Implemented");
+    catch (error) {
+      throw this.wrapError(error);
+    }
   }
 
   /**
@@ -656,9 +720,14 @@ export class MongoDB extends Service {
    * @param index - Index name
    */
   async createIndex(index: string): Promise<void> {
-    this.assertValidIndexAndCollection(index);
+    try {
+      this.assertValidIndexAndCollection(index);
 
-    await this.getDatabase(index).createCollection(HIDDEN_COLLECTION );
+      await this.getDatabase(index).createCollection(HIDDEN_COLLECTION );
+    }
+    catch (error) {
+      throw this.wrapError(error);
+    }
   }
 
   /**
@@ -683,11 +752,16 @@ export class MongoDB extends Service {
       settings?: {};
     }
   ): Promise<void> {
-    if (await this.hasCollection(index, collection)) {
-      return;
-    }
+    try {
+      if (await this.hasCollection(index, collection)) {
+        return;
+      }
 
-    await this.getDatabase(index).createCollection(collection);
+      await this.getDatabase(index).createCollection(collection);
+    }
+    catch (error) {
+      throw this.wrapError(error);
+    }
   }
   /**
    * Retrieves settings definition for index/type
@@ -700,6 +774,7 @@ export class MongoDB extends Service {
   async getSettings(index: string, collection: string): Promise<any> {
     return {};
   }
+
   /**
    * Retrieves mapping definition for index/type
    *
@@ -760,22 +835,26 @@ export class MongoDB extends Service {
   /**
    * Update a collection mappings
    *
-   * @param {String} index - Index name
-   * @param {String} collection - Collection name
-   * @param {Object} mappings - Collection mappings in ES format
-   *
-   * @returns {Promise.<{ dynamic, _meta, properties }>}
+   * @param index - Index name
+   * @param collection - Collection name
+   * @param mappings - Collection mappings in ES format
    */
-  updateMapping(
-    index: any,
-    collection: any,
+  async updateMapping(
+    index: string,
+    collection: string,
     mappings: CollectionMappings
   ): Promise<{
     _meta: any;
     dynamic: any;
-    properties: import("kuzzle-sdk").MappingsProperties;
+    properties: JSONObject;
   }> {
-    throw Error("Not Implemented");
+    // @todo No op
+
+    return {
+      _meta: {},
+      dynamic: 'strict',
+      properties: {},
+    };
   }
   /**
    * Updates a collection settings (eg: analyzers)
@@ -943,13 +1022,16 @@ export class MongoDB extends Service {
    *
    * @returns {Promise.<Object>} { _shards }
    */
-  refreshCollection(
+  async refreshCollection(
     index: any,
     collection: any
   ): Promise<{
     _shards: any;
   }> {
-    throw Error("Not Implemented");
+    // no op
+    return {
+      _shards: {}
+    };
   }
   /**
    * Returns true if the document exists
@@ -1197,6 +1279,26 @@ export class MongoDB extends Service {
   }> {
     throw Error("Not Implemented");
   }
+
+  private wrapError (error: MongoAPIError) {
+    if (error instanceof KuzzleError) {
+      return error;
+    }
+
+    if (error instanceof MongoServerError) {
+      switch (error.code) {
+        // DuplicateKey: unique constraint violation
+        case 11000:
+          if (Object.keys(error.keyPattern)[0] === '_id') {
+            return kerror.get('document_already_exists', error.message);
+          }
+          return kerror.get('unexpected_error', error.message);
+      }
+    }
+
+    console.log(error);
+    return error;
+  }
 }
 
 function getKuid(userId: string) {
@@ -1205,4 +1307,12 @@ function getKuid(userId: string) {
 
 function getId (id: string) {
   return ObjectId.isValid(id) ? new ObjectId(id): id;
+}
+
+function format (document: WithId<Document>): { _id: string; _source: JSONObject, _version: number } {
+  return {
+    _id: document._id.toString(),
+    _source: document,
+    _version: null,
+  };
 }
